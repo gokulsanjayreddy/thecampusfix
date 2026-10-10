@@ -1,4 +1,4 @@
-# CampusFix 🛠️
+# CampusFix 
 
 CampusFix is a shared campus issue tracker for students and staff to report, track, and resolve physical facility problems using photos or descriptions. Powered by Google's **Gemma 4** through the Gemini API, issues are automatically triaged by category and severity, with an event-sourced community leaderboard that rewards students for reporting, confirming ("+1"), and fixing problems.
 
