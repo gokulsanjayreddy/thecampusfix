@@ -696,7 +696,9 @@ tr:hover td {
 }
 """
 
-with gr.Blocks(title=TITLE, theme=gr.themes.Default(primary_hue="blue", neutral_hue="slate")) as demo:
+custom_theme = gr.themes.Default(primary_hue="blue", neutral_hue="slate")
+
+with gr.Blocks(title=TITLE) as demo:
     session_id_state = gr.State(lambda: f"sess_{int(time.time()*1000)}")
 
     # Top Brand & Global Identity Bar
@@ -995,6 +997,6 @@ if __name__ == "__main__":
     server = "0.0.0.0" if is_lan else "127.0.0.1"
     print(f"Starting CampusFix on {server}:7860 (LAN access: {is_lan})...")
     if is_lan:
-        demo.launch(server_name="0.0.0.0", share=False, css=custom_css)
+        demo.launch(server_name="0.0.0.0", share=False, css=custom_css, theme=custom_theme)
     else:
-        demo.launch(share=False, css=custom_css)
+        demo.launch(share=False, css=custom_css, theme=custom_theme)
