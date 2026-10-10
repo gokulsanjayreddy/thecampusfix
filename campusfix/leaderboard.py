@@ -1,5 +1,5 @@
-"""Leaderboard module: points replay, badges, ranking, and campus statistics."""
-
+"""Leaderboard module: points replay, badges, ranking, and campus statistics"""
+#this is leaderboard
 from datetime import datetime, timedelta, timezone
 import re
 
