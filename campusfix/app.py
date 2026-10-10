@@ -485,7 +485,7 @@ custom_css = """
 .stat-box { border-radius: 8px; padding: 12px; }
 """
 
-with gr.Blocks(title=TITLE, css=custom_css) as demo:
+with gr.Blocks(title=TITLE) as demo:
     session_id_state = gr.State(lambda: f"sess_{int(time.time()*1000)}")
 
     gr.Markdown(f"# 🛠️ {TITLE}: Campus Issue Tracker & Leaderboard", elem_classes=["main-header"])
@@ -749,6 +749,6 @@ if __name__ == "__main__":
     server = "0.0.0.0" if is_lan else "127.0.0.1"
     print(f"Starting CampusFix on {server}:7860 (LAN access: {is_lan})...")
     if is_lan:
-        demo.launch(server_name="0.0.0.0", share=False)
+        demo.launch(server_name="0.0.0.0", share=False, css=custom_css)
     else:
-        demo.launch(share=False)
+        demo.launch(share=False, css=custom_css)

@@ -63,5 +63,5 @@ if key_found and not failed:
 else:
     print("SKIP  Gemma call (fix the steps above first)")
 
-print("\nAll good. Next: python 01_hello.py" if not failed else "\nFix the FAIL lines above, then run this script again.")
+print("\nAll good. Next: python campusfix/app.py" if not failed else "\nFix the FAIL lines above, then run this script again.")
 sys.exit(1 if failed else 0)
