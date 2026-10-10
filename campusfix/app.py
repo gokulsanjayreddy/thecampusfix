@@ -1,6 +1,9 @@
 """CampusFix: Shared campus issue board and leaderboard powered by Gemma 4.
 
-Clean, Light, Minimal, Production-Quality Interface.
+Matte Dark Civic Interface.
+Palette: #0b0b0e (base), #151518 (surface), #1c1c21 (surfaceAlt), #24242a (border), #2563eb (blue).
+Zero emojis, clean typography, system telemetry, and functional hierarchy.
+
 Run from repo root:
     python campusfix/app.py
 Or for LAN access:
@@ -57,10 +60,17 @@ from campusfix.store import (
 from campusfix.triage import triage
 from harness import Agent
 
-# CHANGE THIS: title shown at the top of the page.
+# Application title
 TITLE = "CampusFix"
 
-# In-memory session tracking for rate limiting (session_id -> list of submission timestamps)
+# Load styles from static/css/styles.css
+CSS_PATH = ROOT / "static" / "css" / "styles.css"
+if CSS_PATH.exists():
+    custom_css = CSS_PATH.read_text(encoding="utf-8")
+else:
+    custom_css = ""
+
+# Session tracking for rate limiting (session_id -> list of submission timestamps)
 _SESSION_SUBMITS = {}
 
 
@@ -93,77 +103,10 @@ def format_campus_time(iso_str):
         return str(iso_str)[:16]
 
 
-def get_banner_image_path():
-    """Locate user-provided banner image inside assets/ or docs/."""
-    for base in [ROOT / "assets", ROOT / "docs"]:
-        if base.exists():
-            for name in [
-                "banner.png", "banner.jpg", "banner.jpeg", "banner.webp",
-                "campus_banner.png", "campus_banner.jpg", "campus_banner.jpeg",
-                "main_banner.png", "main_banner.jpg", "hero.png", "hero.jpg"
-            ]:
-                candidate = base / name
-                if candidate.exists() and candidate.is_file():
-                    return str(candidate)
-            # Match any image in assets
-            if base.name == "assets":
-                for img in base.glob("*.*"):
-                    if img.suffix.lower() in [".jpg", ".jpeg", ".png", ".webp"]:
-                        return str(img)
-    return None
-
-
-def render_banner_html():
-    """Render the hero banner with the supplied image or clean placeholder."""
-    img_path = get_banner_image_path()
-    if img_path:
-        img_rel = Path(img_path).relative_to(ROOT).as_posix() if ROOT in Path(img_path).parents else Path(img_path).name
-        img_html = f'''
-        <div style="flex: 1 1 360px; max-width: 520px; overflow: hidden; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff;">
-            <img src="/file={img_path}" alt="CampusFix Hero Banner" style="width: 100%; height: 210px; object-fit: cover; display: block;" />
-        </div>
-        '''
-    else:
-        img_html = '''
-        <div style="flex: 1 1 320px; max-width: 460px; height: 210px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center;">
-            <span style="font-size: 1.75rem; margin-bottom: 8px;">🏛️</span>
-            <span style="font-size: 0.95rem; font-weight: 600; color: #334155;">CampusFix Hero Banner</span>
-            <span style="font-size: 0.8rem; color: #64748b; margin-top: 4px; line-height: 1.4;">
-                Upload your main banner image to <code>assets/banner.jpg</code> or <code>assets/banner.png</code>.
-            </span>
-        </div>
-        '''
-
-    return f'''
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-        <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: center; justify-content: space-between;">
-            <div style="flex: 1 1 380px; min-width: 280px;">
-                <div style="display: inline-block; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #1d4ed8; background: #eff6ff; padding: 3px 8px; border-radius: 4px; margin-bottom: 10px;">
-                    Civic Infrastructure & Maintenance
-                </div>
-                <h1 style="font-size: 1.85rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin: 0 0 8px 0; line-height: 1.2;">
-                    Campus Overview
-                </h1>
-                <p style="font-size: 0.95rem; color: #475569; line-height: 1.5; margin: 0 0 16px 0; max-width: 520px;">
-                    Track campus issues, support your community, and follow progress toward resolution.
-                    Powered by lightweight <strong>Gemma 4</strong> multimodal triage.
-                </p>
-                <div style="display: flex; gap: 12px; font-size: 0.85rem; color: #64748b;">
-                    <span>✓ Automated AI Triage</span>
-                    <span>•</span>
-                    <span>✓ Fair Aging Priority</span>
-                    <span>•</span>
-                    <span>✓ Community Badges</span>
-                </div>
-            </div>
-            {img_html}
-        </div>
-    </div>
-    '''
 
 
 def render_stats_cards_html():
-    """Render four compact statistical metric cards."""
+    """Render four compact statistical metric cards matching the KeyMetricsGrid."""
     all_issues = list_issues()
     total = len(all_issues)
     open_cnt = len([i for i in all_issues if i.get("status") == "open"])
@@ -171,28 +114,46 @@ def render_stats_cards_html():
     resolved_cnt = len([i for i in all_issues if i.get("status") == "resolved"])
 
     return f'''
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
-        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
-            <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">Total Reports</div>
-            <div style="font-size: 1.85rem; font-weight: 700; color: #0f172a; margin-top: 4px; letter-spacing: -0.02em;">{total}</div>
-            <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Logged in system</div>
+    <section aria-label="System Metrics" style="margin-bottom: 20px; width: 100%; box-sizing: border-box;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding: 0 2px;">
+            <h3 style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #8e8e99; margin: 0;">System Telemetry</h3>
+            <span style="font-size: 10px; color: #71717a; font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;">Live Sync</span>
         </div>
-        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
-            <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">Open Issues</div>
-            <div style="font-size: 1.85rem; font-weight: 700; color: #1d4ed8; margin-top: 4px; letter-spacing: -0.02em;">{open_cnt}</div>
-            <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Awaiting resolution</div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; width: 100%; box-sizing: border-box;">
+            <article style="background: #151518; border: 1px solid #24242a; padding: 14px 16px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div style="display: flex; align-items: center; justify-content: space-between; color: #8e8e99; margin-bottom: 8px;">
+                    <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;">Total Reports</span>
+                    <span style="width: 6px; height: 6px; border-radius: 50%; background: #71717a;"></span>
+                </div>
+                <div style="font-size: 1.75rem; font-weight: 700; font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace; color: #ffffff; letter-spacing: -0.02em; line-height: 1; margin-bottom: 4px;">{total}</div>
+                <span style="font-size: 11px; color: #8e8e99;">Logged in system</span>
+            </article>
+            <article style="background: #151518; border: 1px solid #24242a; padding: 14px 16px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div style="display: flex; align-items: center; justify-content: space-between; color: #8e8e99; margin-bottom: 8px;">
+                    <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;">Open Issues</span>
+                    <span style="width: 6px; height: 6px; border-radius: 50%; background: #2563eb;"></span>
+                </div>
+                <div style="font-size: 1.75rem; font-weight: 700; font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace; color: #60a5fa; letter-spacing: -0.02em; line-height: 1; margin-bottom: 4px;">{open_cnt}</div>
+                <span style="font-size: 11px; color: #8e8e99;">Awaiting resolution</span>
+            </article>
+            <article style="background: #151518; border: 1px solid #24242a; padding: 14px 16px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div style="display: flex; align-items: center; justify-content: space-between; color: #8e8e99; margin-bottom: 8px;">
+                    <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;">High Priority</span>
+                    <span style="width: 6px; height: 6px; border-radius: 50%; background: #ef4444;"></span>
+                </div>
+                <div style="font-size: 1.75rem; font-weight: 700; font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace; color: #f87171; letter-spacing: -0.02em; line-height: 1; margin-bottom: 4px;">{urgent_cnt}</div>
+                <span style="font-size: 11px; color: #8e8e99;">High &amp; Critical</span>
+            </article>
+            <article style="background: #151518; border: 1px solid #24242a; padding: 14px 16px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div style="display: flex; align-items: center; justify-content: space-between; color: #8e8e99; margin-bottom: 8px;">
+                    <span style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;">Resolved</span>
+                    <span style="width: 6px; height: 6px; border-radius: 50%; background: #10b981;"></span>
+                </div>
+                <div style="font-size: 1.75rem; font-weight: 700; font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace; color: #34d399; letter-spacing: -0.02em; line-height: 1; margin-bottom: 4px;">{resolved_cnt}</div>
+                <span style="font-size: 11px; color: #8e8e99;">Verified fixed</span>
+            </article>
         </div>
-        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
-            <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">High Priority</div>
-            <div style="font-size: 1.85rem; font-weight: 700; color: #b91c1c; margin-top: 4px; letter-spacing: -0.02em;">{urgent_cnt}</div>
-            <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">High & Critical severity</div>
-        </div>
-        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
-            <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">Resolved Issues</div>
-            <div style="font-size: 1.85rem; font-weight: 700; color: #15803d; margin-top: 4px; letter-spacing: -0.02em;">{resolved_cnt}</div>
-            <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Verified fixed</div>
-        </div>
-    </div>
+    </section>
     '''
 
 
@@ -217,8 +178,8 @@ def get_recent_issues_table():
 
 
 def get_points_rules_md():
-    """Generate the points rules card directly from constants."""
-    return f"""### 🎯 How to Earn Points
+    """Generate the points rules card directly from constants without emojis."""
+    return f"""### How to Earn Points
 - **Report an issue:** **{PTS_REPORT}** pts (+**{PTS_FULL_REPORT_BONUS}** bonus if report includes both photo & text)
 - **Confirm an issue ("I face this too"):** **{PTS_CONFIRM_OTHERS}** pts (daily cap: **{PTS_CONFIRM_DAILY_CAP}** pts)
 - **Bonus when someone confirms your report:** **{PTS_REPORTER_PER_CONFIRM}** pt per confirmation (max **{PTS_REPORTER_CONFIRM_CAP}** pts per issue)
@@ -334,7 +295,7 @@ def view_issue_details(issue_id):
     if not issue:
         return f"Issue `{clean_id}` was not found.", None, []
 
-    status_tag = "🟢 OPEN" if issue.get("status") == "open" else "⚪ RESOLVED"
+    status_tag = "OPEN" if issue.get("status") == "open" else "RESOLVED"
     sev_badge = issue.get("severity", "medium").upper()
 
     img_path = ROOT / issue["image"] if issue.get("image") else None
@@ -512,22 +473,22 @@ def submit_report(image_path, text_input, nickname_input, session_token):
         if has_image and clean_text:
             points_earned += PTS_FULL_REPORT_BONUS
 
-    pts_notice = f"⭐ **You earned {points_earned} points!**" if points_earned > 0 else (
+    pts_notice = f"**Points awarded:** {points_earned} points." if points_earned > 0 else (
         "*(No points awarded: anonymous report or needs moderation)*"
     )
 
     review_notice = ""
     if created["needs_review"]:
         review_notice = (
-            "\n\n> 🔍 **Needs Moderation:** This report was flagged for review "
+            "\n\n> **Needs Moderation:** This report was flagged for review "
             "(it may be ambiguous or uncertain). It is queued in 'Needs a Look'."
         )
 
     dup_notice = ""
     if dup_hints:
-        dup_notice = "\n\n💡 **Similar existing issues:**\n- " + "\n- ".join(dup_hints) + "\n*(Consider confirming an existing issue instead of creating duplicate tickets!)*"
+        dup_notice = "\n\n**Similar existing issues:**\n- " + "\n- ".join(dup_hints) + "\n*(Consider confirming an existing issue instead of creating duplicate tickets.)*"
 
-    result_md = f"""### ✅ Issue Logged Successfully
+    result_md = f"""### Issue Logged Successfully
 
 - **Issue ID:** `{created['id']}`
 - **Title:** **{created['title']}**
@@ -545,7 +506,7 @@ def submit_report(image_path, text_input, nickname_input, session_token):
 # ---------------- TAB 4: LEADERBOARD ----------------
 
 def load_leaderboard_view(time_window, nickname):
-    """Compute leaderboard rankings and campus statistics."""
+    """Compute leaderboard rankings and campus statistics without emojis."""
     now_utc = datetime.now(timezone.utc)
     all_issues = list_issues()
     window_days = 7 if time_window == "Last 7 days" else None
@@ -567,11 +528,11 @@ def load_leaderboard_view(time_window, nickname):
     user_rank = rank_of(rows, nickname)
     if user_rank is not None:
         user_row = next(r for r in rows if r["rank"] == user_rank)
-        rank_md = f"🏅 **Your standing:** You are **Rank #{user_rank}** with **{user_row['points']} pts** ({user_row['badges']})!"
+        rank_md = f"**Your standing:** You are **Rank #{user_rank}** with **{user_row['points']} pts** ({user_row['badges']})."
     elif nickname and clean_nickname(nickname) != "anonymous":
-        rank_md = f"👋 Hello **{clean_nickname(nickname)}**! You have 0 points. Submit a report or resolve an issue to appear on the leaderboard."
+        rank_md = f"Hello **{clean_nickname(nickname)}**! You currently have 0 points. Submit a report or resolve an issue to appear on the leaderboard."
     else:
-        rank_md = "💡 *Enter your nickname in the header above to check your personal rank.*"
+        rank_md = "*Enter your nickname in the header above to check your personal rank.*"
 
     # Campus stats summary
     stats = campus_stats(all_issues, now_utc)
@@ -606,97 +567,7 @@ def ask_the_board(query):
 
 # ---------------- PRODUCTION GRADIO INTERFACE ----------------
 
-custom_css = """
-/* Clean, Light, Production SaaS Styling */
-body, .gradio-container {
-    background-color: #f8fafc !important;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
-    color: #0f172a !important;
-}
-
-/* Header bar */
-.cf-header {
-    background: #ffffff;
-    border-bottom: 1px solid #e2e8f0;
-    padding: 14px 24px;
-    margin-bottom: 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-/* Subtle cards */
-.cf-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
-}
-
-/* Tabs appearance */
-.tabs > .tab-nav {
-    border-bottom: 1px solid #e2e8f0 !important;
-    background: transparent !important;
-}
-
-.tabs > .tab-nav button {
-    font-size: 0.95rem !important;
-    font-weight: 500 !important;
-    color: #475569 !important;
-    padding: 8px 16px !important;
-    border-bottom: 2px solid transparent !important;
-}
-
-.tabs > .tab-nav button.selected {
-    color: #1d4ed8 !important;
-    border-bottom: 2px solid #1d4ed8 !important;
-    font-weight: 600 !important;
-}
-
-/* Restrained Primary Buttons */
-button.primary {
-    background: #1d4ed8 !important;
-    color: #ffffff !important;
-    border: 1px solid #1e40af !important;
-    border-radius: 6px !important;
-    font-weight: 500 !important;
-}
-
-button.primary:hover {
-    background: #1e40af !important;
-}
-
-/* Tables */
-table {
-    border-collapse: separate !important;
-    border-spacing: 0 !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 6px !important;
-    background: #ffffff !important;
-}
-
-th {
-    background-color: #f8fafc !important;
-    color: #475569 !important;
-    font-size: 0.8rem !important;
-    font-weight: 600 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.04em !important;
-    border-bottom: 1px solid #e2e8f0 !important;
-}
-
-td {
-    color: #1e293b !important;
-    border-bottom: 1px solid #f1f5f9 !important;
-}
-
-tr:hover td {
-    background-color: #f8fafc !important;
-}
-"""
-
-custom_theme = gr.themes.Default(primary_hue="blue", neutral_hue="slate")
+custom_theme = gr.themes.Default(primary_hue="blue", neutral_hue="zinc")
 
 with gr.Blocks(title=TITLE) as demo:
     session_id_state = gr.State(lambda: f"sess_{int(time.time()*1000)}")
@@ -704,15 +575,25 @@ with gr.Blocks(title=TITLE) as demo:
     # Top Brand & Global Identity Bar
     with gr.Row(elem_classes=["cf-card"]):
         with gr.Column(scale=3):
-            gr.Markdown(
-                "## 🛠️ **CampusFix**  \n"
-                "<span style='font-size:0.85rem; color:#64748b; font-weight:normal;'>"
-                "Intelligent campus issue board & community participation tracker • Model: <code>gemma-4-26b-a4b-it</code>"
-                "</span>"
+            gr.HTML(
+                '''
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <div style="display: flex; items-center; gap: 8px; align-items: center;">
+                        <span style="width: 10px; height: 10px; background: #2563eb; display: inline-block;"></span>
+                        <h1 style="font-weight: 700; font-size: 1.25rem; color: #ffffff; letter-spacing: -0.02em; margin: 0; line-height: 1;">CampusFix</h1>
+                        <span style="font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace; font-size: 10px; letter-spacing: 0.04em; color: #a1a1aa; background: #0b0b0e; border: 1px solid #24242a; padding: 2px 6px; border-radius: 2px;">
+                            gemma-4-26b-a4b-it
+                        </span>
+                    </div>
+                    <p style="font-size: 11px; color: #8e8e99; margin: 2px 0 0 0;">
+                        Civic Infrastructure &amp; Maintenance • Single-call AI Triage
+                    </p>
+                </div>
+                '''
             )
         with gr.Column(scale=2):
             nickname_input = gr.Textbox(
-                label="👤 Your Nickname (Public Community ID)",
+                label="Your Public Nickname (ID)",
                 placeholder="e.g. campus_fixer",
                 value="",
             )
@@ -721,11 +602,14 @@ with gr.Blocks(title=TITLE) as demo:
     with gr.Tabs() as tabs:
 
         # ---------------- 1. OVERVIEW DASHBOARD ----------------
-        with gr.Tab("🏛️ Overview", id="tab_overview"):
-            banner_view = gr.HTML(value=render_banner_html)
+        with gr.Tab("Overview", id="tab_overview"):
+            with gr.Row():
+                nav_report_btn = gr.Button("Report an Issue", variant="primary", scale=1)
+                nav_browse_btn = gr.Button("Browse All Issues", variant="secondary", scale=1)
+
             stats_view = gr.HTML(value=render_stats_cards_html)
 
-            gr.Markdown("### 🕒 Recently Logged Campus Issues")
+            gr.Markdown("### Recently Logged Campus Issues")
             recent_table = gr.Dataframe(
                 headers=["ID", "Severity", "Status", "Category", "Title", "Location", f"Reported ({CAMPUS_TZ})", "+1s"],
                 value=get_recent_issues_table,
@@ -733,18 +617,27 @@ with gr.Blocks(title=TITLE) as demo:
             )
 
             with gr.Row():
-                refresh_overview_btn = gr.Button("🔄 Refresh Overview", variant="secondary")
+                refresh_overview_btn = gr.Button("Refresh Overview", variant="secondary")
 
             def refresh_overview_action():
-                return render_banner_html(), render_stats_cards_html(), get_recent_issues_table()
+                return render_stats_cards_html(), get_recent_issues_table()
 
             refresh_overview_btn.click(
                 refresh_overview_action,
-                outputs=[banner_view, stats_view, recent_table],
+                outputs=[stats_view, recent_table],
             )
 
-        # ---------------- 2. CAMPUS ISSUES BOARD ----------------
-        with gr.Tab("📋 Campus Issues", id="tab_issues"):
+            nav_report_btn.click(
+                lambda: gr.Tabs(selected="tab_report"),
+                outputs=[tabs],
+            )
+            nav_browse_btn.click(
+                lambda: gr.Tabs(selected="tab_issues"),
+                outputs=[tabs],
+            )
+
+        # ---------------- 2. BROWSE CAMPUS ISSUES ----------------
+        with gr.Tab("Browse Issues", id="tab_issues"):
             with gr.Row():
                 search_box = gr.Textbox(
                     label="Search Issues",
@@ -769,7 +662,7 @@ with gr.Blocks(title=TITLE) as demo:
                     value="All",
                     scale=1,
                 )
-                board_refresh_btn = gr.Button("🔄 Refresh", variant="secondary", scale=1)
+                board_refresh_btn = gr.Button("Filter / Refresh", variant="secondary", scale=1)
 
             board_table = gr.Dataframe(
                 headers=["Score", "ID", "Severity", "Status", "Category", "Title", "Location", f"Reported ({CAMPUS_TZ})", "Age", "+1s"],
@@ -778,7 +671,7 @@ with gr.Blocks(title=TITLE) as demo:
             )
 
             gr.Markdown("---")
-            gr.Markdown("### 🔍 Inspect Issue Details & Actions")
+            gr.Markdown("### Issue Details & Actions")
 
             with gr.Row():
                 with gr.Column(scale=1):
@@ -789,15 +682,15 @@ with gr.Blocks(title=TITLE) as demo:
                     inspect_btn = gr.Button("Inspect Issue", variant="secondary")
                     action_feedback = gr.Markdown("")
 
-                    me_too_btn = gr.Button("👍 I Face This Too (+1)", variant="secondary")
+                    me_too_btn = gr.Button("I Face This Too (+1)", variant="secondary")
 
                     resolve_note_input = gr.Textbox(
                         label="Resolution Note",
                         placeholder="Explain what was repaired (min 10 characters required)...",
                         lines=2,
                     )
-                    resolve_btn = gr.Button("✅ Mark Resolved", variant="primary")
-                    reopen_btn = gr.Button("🔄 Reopen Issue", variant="stop")
+                    resolve_btn = gr.Button("Mark Resolved", variant="primary")
+                    reopen_btn = gr.Button("Reopen Issue", variant="secondary")
 
                 with gr.Column(scale=2):
                     issue_details_md = gr.Markdown("Select an issue ID on the left to view full details.")
@@ -809,7 +702,7 @@ with gr.Blocks(title=TITLE) as demo:
                     )
 
             # Moderation Review Accordion
-            with gr.Accordion("🔍 Needs a Look (Moderator Review Queue)", open=False):
+            with gr.Accordion("Moderator Review Queue (Needs a Look)", open=False):
                 with gr.Row():
                     review_select = gr.Dropdown(
                         label="Flagged Issues",
@@ -825,8 +718,8 @@ with gr.Blocks(title=TITLE) as demo:
                 review_feedback = gr.Markdown("")
 
             # Stretch Agent Tool Accordion
-            with gr.Accordion("🤖 Stretch Feature: Ask the Board (AI Agent with Tools)", open=False):
-                gr.Markdown("*(Note: This experimental tool executes an agent loop using `Agent(max_steps=3)`)*")
+            with gr.Accordion("Ask the Board (AI Agent with Tools)", open=False):
+                gr.Markdown("*(Note: Executes an agent loop using read-only tools: list_top_issues, count_by_category, find_issues)*")
                 with gr.Row():
                     ask_query = gr.Textbox(
                         label="Query",
@@ -913,19 +806,19 @@ with gr.Blocks(title=TITLE) as demo:
             )
 
         # ---------------- 3. REPORT AN ISSUE ----------------
-        with gr.Tab("📝 Report an Issue", id="tab_report"):
+        with gr.Tab("Report an Issue", id="tab_report"):
             gr.Markdown(
                 "### Report a Campus Facility Problem  \n"
-                "<span style='font-size:0.9rem; color:#64748b;'>"
+                "<span style='font-size:0.85rem; color:#8e8e99;'>"
                 "Submit a photo, description, or both. Gemma 4 will automatically categorize and assess severity."
                 "</span>"
             )
 
             with gr.Row():
                 with gr.Column(scale=1):
-                    report_img_input = gr.Image(type="filepath", label="📷 Upload Photo (optional)")
+                    report_img_input = gr.Image(type="filepath", label="Upload Photo (optional)")
                     report_txt_input = gr.Textbox(
-                        label="📄 Problem Description (optional, max 1000 characters)",
+                        label="Problem Description (optional, max 1000 characters)",
                         placeholder="Describe the issue, location, or physical damage...",
                         lines=4,
                         max_lines=8,
@@ -943,14 +836,14 @@ with gr.Blocks(title=TITLE) as demo:
             )
 
         # ---------------- 4. LEADERBOARD ----------------
-        with gr.Tab("🏆 Leaderboard", id="tab_leaderboard"):
+        with gr.Tab("Leaderboard", id="tab_leaderboard"):
             with gr.Row():
                 time_radio = gr.Radio(
                     label="Leaderboard Window",
                     choices=["All time", "Last 7 days"],
                     value="All time",
                 )
-                refresh_leaderboard_btn = gr.Button("🔄 Refresh Rankings", variant="secondary")
+                refresh_leaderboard_btn = gr.Button("Refresh Rankings", variant="secondary")
 
             user_rank_card = gr.Markdown("Enter your nickname in the header above to see your personal rank.")
             stats_strip = gr.Markdown("")
@@ -963,7 +856,7 @@ with gr.Blocks(title=TITLE) as demo:
 
             gr.Markdown(get_points_rules_md())
             gr.Markdown(
-                "> ℹ️ **Fairness & Privacy Notice:** Nicknames are self-assigned and unauthenticated. "
+                "> **Fairness & Privacy Notice:** Nicknames are self-assigned and unauthenticated. "
                 "The leaderboard is designed for friendly community motivation rather than high-stakes prizes."
             )
 
@@ -996,7 +889,9 @@ if __name__ == "__main__":
     is_lan = os.environ.get("CAMPUSFIX_LAN") == "1"
     server = "0.0.0.0" if is_lan else "127.0.0.1"
     print(f"Starting CampusFix on {server}:7860 (LAN access: {is_lan})...")
+    allowed = [str(ROOT / "assets"), str(ROOT / "static"), str(ROOT / "notes")]
+    dark_js = "() => document.documentElement.classList.add('dark')"
     if is_lan:
-        demo.launch(server_name="0.0.0.0", share=False, css=custom_css, theme=custom_theme)
+        demo.launch(server_name="0.0.0.0", share=False, css=custom_css, theme=custom_theme, js=dark_js, allowed_paths=allowed)
     else:
-        demo.launch(share=False, css=custom_css, theme=custom_theme)
+        demo.launch(share=False, css=custom_css, theme=custom_theme, js=dark_js, allowed_paths=allowed)
