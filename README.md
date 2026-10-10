@@ -1,6 +1,6 @@
-# CampusFix 
+# CampusFix  
 
-CampusFix is a shared campus issue tracker for students and staff to report, track, and resolve physical facility problems using photos or descriptions. Powered by Google's **Gemma 4** through the Gemini API, issues are automatically triaged by category and severity, with an event-sourced community leaderboard that rewards students for reporting, confirming ("+1"), and fixing problems.
+CampusFix is a shared campus issue tracker for students and staff to report, track, and resolve physical facility problems using photos or descriptions. Powered by Google's **Gemma 4** through the Gemini API, issues are automatically triaged by category and severity, with an event-sourced community leaderboard that rewards students for reporting, confirming ("+1"), and fixing  problems.
 
 Team: **The Creative Crew**  
 Event: **MLH Hack Day: Gemma 4 through the Gemini API**  
@@ -31,7 +31,7 @@ CampusFix uses **`gemma-4-26b-a4b-it`** through the official Google Gemini API v
 
 ---
 
-## How to run it (5 steps)
+## How to run it (5 steps) 
 
 ### 1. Get a free API key
 Sign in to [Google AI Studio](https://aistudio.google.com) and create a Gemini API key.
