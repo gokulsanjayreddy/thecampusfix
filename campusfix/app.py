@@ -1,5 +1,6 @@
 """CampusFix: Shared campus issue board and leaderboard powered by Gemma 4.
 
+Clean, Light, Minimal, Production-Quality Interface.
 Run from repo root:
     python campusfix/app.py
 Or for LAN access:
@@ -18,8 +19,6 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 import gradio as gr
-
-from harness import Agent
 
 from campusfix.config import (
     CAMPUS_TZ,
@@ -56,6 +55,7 @@ from campusfix.store import (
     resolve,
 )
 from campusfix.triage import triage
+from harness import Agent
 
 # CHANGE THIS: title shown at the top of the page.
 TITLE = "CampusFix"
@@ -93,6 +93,129 @@ def format_campus_time(iso_str):
         return str(iso_str)[:16]
 
 
+def get_banner_image_path():
+    """Locate user-provided banner image inside assets/ or docs/."""
+    for base in [ROOT / "assets", ROOT / "docs"]:
+        if base.exists():
+            for name in [
+                "banner.png", "banner.jpg", "banner.jpeg", "banner.webp",
+                "campus_banner.png", "campus_banner.jpg", "campus_banner.jpeg",
+                "main_banner.png", "main_banner.jpg", "hero.png", "hero.jpg"
+            ]:
+                candidate = base / name
+                if candidate.exists() and candidate.is_file():
+                    return str(candidate)
+            # Match any image in assets
+            if base.name == "assets":
+                for img in base.glob("*.*"):
+                    if img.suffix.lower() in [".jpg", ".jpeg", ".png", ".webp"]:
+                        return str(img)
+    return None
+
+
+def render_banner_html():
+    """Render the hero banner with the supplied image or clean placeholder."""
+    img_path = get_banner_image_path()
+    if img_path:
+        img_rel = Path(img_path).relative_to(ROOT).as_posix() if ROOT in Path(img_path).parents else Path(img_path).name
+        img_html = f'''
+        <div style="flex: 1 1 360px; max-width: 520px; overflow: hidden; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff;">
+            <img src="/file={img_path}" alt="CampusFix Hero Banner" style="width: 100%; height: 210px; object-fit: cover; display: block;" />
+        </div>
+        '''
+    else:
+        img_html = '''
+        <div style="flex: 1 1 320px; max-width: 460px; height: 210px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center;">
+            <span style="font-size: 1.75rem; margin-bottom: 8px;">🏛️</span>
+            <span style="font-size: 0.95rem; font-weight: 600; color: #334155;">CampusFix Hero Banner</span>
+            <span style="font-size: 0.8rem; color: #64748b; margin-top: 4px; line-height: 1.4;">
+                Upload your main banner image to <code>assets/banner.jpg</code> or <code>assets/banner.png</code>.
+            </span>
+        </div>
+        '''
+
+    return f'''
+    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+        <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: center; justify-content: space-between;">
+            <div style="flex: 1 1 380px; min-width: 280px;">
+                <div style="display: inline-block; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #1d4ed8; background: #eff6ff; padding: 3px 8px; border-radius: 4px; margin-bottom: 10px;">
+                    Civic Infrastructure & Maintenance
+                </div>
+                <h1 style="font-size: 1.85rem; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin: 0 0 8px 0; line-height: 1.2;">
+                    Campus Overview
+                </h1>
+                <p style="font-size: 0.95rem; color: #475569; line-height: 1.5; margin: 0 0 16px 0; max-width: 520px;">
+                    Track campus issues, support your community, and follow progress toward resolution.
+                    Powered by lightweight <strong>Gemma 4</strong> multimodal triage.
+                </p>
+                <div style="display: flex; gap: 12px; font-size: 0.85rem; color: #64748b;">
+                    <span>✓ Automated AI Triage</span>
+                    <span>•</span>
+                    <span>✓ Fair Aging Priority</span>
+                    <span>•</span>
+                    <span>✓ Community Badges</span>
+                </div>
+            </div>
+            {img_html}
+        </div>
+    </div>
+    '''
+
+
+def render_stats_cards_html():
+    """Render four compact statistical metric cards."""
+    all_issues = list_issues()
+    total = len(all_issues)
+    open_cnt = len([i for i in all_issues if i.get("status") == "open"])
+    urgent_cnt = len([i for i in all_issues if i.get("status") == "open" and i.get("severity") in ("high", "critical")])
+    resolved_cnt = len([i for i in all_issues if i.get("status") == "resolved"])
+
+    return f'''
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+            <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">Total Reports</div>
+            <div style="font-size: 1.85rem; font-weight: 700; color: #0f172a; margin-top: 4px; letter-spacing: -0.02em;">{total}</div>
+            <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Logged in system</div>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+            <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">Open Issues</div>
+            <div style="font-size: 1.85rem; font-weight: 700; color: #1d4ed8; margin-top: 4px; letter-spacing: -0.02em;">{open_cnt}</div>
+            <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Awaiting resolution</div>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+            <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">High Priority</div>
+            <div style="font-size: 1.85rem; font-weight: 700; color: #b91c1c; margin-top: 4px; letter-spacing: -0.02em;">{urgent_cnt}</div>
+            <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">High & Critical severity</div>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+            <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b;">Resolved Issues</div>
+            <div style="font-size: 1.85rem; font-weight: 700; color: #15803d; margin-top: 4px; letter-spacing: -0.02em;">{resolved_cnt}</div>
+            <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 4px;">Verified fixed</div>
+        </div>
+    </div>
+    '''
+
+
+def get_recent_issues_table():
+    """Load the 5 most recent issues for the overview dashboard."""
+    all_issues = list_issues()
+    all_issues.sort(key=lambda x: _parse_utc(x.get("created_at")).timestamp(), reverse=True)
+    rows = []
+    for itm in all_issues[:5]:
+        status_label = "OPEN" if itm.get("status") == "open" else "RESOLVED"
+        rows.append([
+            itm.get("id"),
+            itm.get("severity", "").upper(),
+            status_label,
+            itm.get("category"),
+            itm.get("title"),
+            itm.get("location_hint") or "unknown",
+            format_campus_time(itm.get("created_at")),
+            f"+{itm.get('confirmations', 0)}",
+        ])
+    return rows
+
+
 def get_points_rules_md():
     """Generate the points rules card directly from constants."""
     return f"""### 🎯 How to Earn Points
@@ -106,7 +229,200 @@ def get_points_rules_md():
 """
 
 
-# ---------------- TAB 1: REPORT A PROBLEM ----------------
+# ---------------- TAB 1: OVERVIEW & TAB 2: ISSUES ----------------
+
+def filter_board_data(search_query, status_filter, category_filter, severity_filter):
+    """Filter, score, and rank issues based on user controls."""
+    now_utc = datetime.now(timezone.utc)
+    all_issues = list_issues()
+
+    # 1. Filter by status
+    if status_filter == "Open":
+        filtered = [i for i in all_issues if i.get("status") == "open" and not i.get("needs_review")]
+    elif status_filter == "Resolved (Archive)":
+        filtered = [i for i in all_issues if i.get("status") == "resolved"]
+    else:  # "All"
+        filtered = all_issues
+
+    # 2. Filter by category
+    if category_filter and category_filter != "All":
+        clean_cat = category_filter.split(" (")[0].strip()
+        filtered = [i for i in filtered if i.get("category") == clean_cat]
+
+    # 3. Filter by severity
+    if severity_filter and severity_filter != "All":
+        filtered = [i for i in filtered if i.get("severity", "").lower() == severity_filter.lower()]
+
+    # 4. Search query
+    if search_query and search_query.strip():
+        q = search_query.strip().lower()
+        filtered = [
+            i for i in filtered
+            if q in f"{i.get('title', '')} {i.get('summary', '')} {i.get('text', '')} {i.get('location_hint', '')} {i.get('id', '')}".lower()
+        ]
+
+    # 5. Build presentation rows
+    rows = []
+    for item in filtered:
+        days = age_days(item, now_utc)
+        score = priority_score(item, now_utc) if item.get("status") == "open" else 0.0
+        label = age_label(days) if item.get("status") == "open" else "Resolved"
+        rows.append({
+            "score": score,
+            "id": item.get("id"),
+            "severity": item.get("severity", "medium").upper(),
+            "status": "OPEN" if item.get("status") == "open" else "RESOLVED",
+            "category": item.get("category"),
+            "title": item.get("title"),
+            "location": item.get("location_hint") or "unknown",
+            "reported": format_campus_time(item.get("created_at")),
+            "age": f"{days:.1f}d",
+            "status_label": label,
+            "confirmations": f"+{item.get('confirmations', 0)}",
+            "created_ts": _parse_utc(item.get("created_at")).timestamp(),
+        })
+
+    # Sort open items by score desc then created_at asc; resolved by date desc
+    rows.sort(key=lambda r: (-r["score"], r["created_ts"]))
+
+    table_data = []
+    for r in rows:
+        table_data.append([
+            f"{r['score']:.1f}" if r["status"] == "OPEN" else "-",
+            r["id"],
+            r["severity"],
+            r["status"],
+            r["category"],
+            r["title"],
+            r["location"],
+            r["reported"],
+            r["age"],
+            r["confirmations"],
+        ])
+
+    return table_data
+
+
+def get_category_choices():
+    """Return category dropdown choices with current open issue counts."""
+    open_issues = list_issues(status="open")
+    counts = {}
+    for i in open_issues:
+        c = i.get("category", "Other")
+        counts[c] = counts.get(c, 0) + 1
+
+    choices = ["All"]
+    for cat in CATEGORIES:
+        cnt = counts.get(cat, 0)
+        choices.append(f"{cat} ({cnt})")
+    return choices
+
+
+def get_review_choices():
+    """List IDs of issues waiting for moderator review."""
+    review_issues = [i for i in list_issues() if i.get("needs_review")]
+    return [f"{i['id']} - {i['title']}" for i in review_issues]
+
+
+def view_issue_details(issue_id):
+    """Render details, photo, and event log for a selected issue."""
+    if not issue_id or not str(issue_id).strip():
+        return "Select an issue ID from the table to inspect details.", None, []
+
+    clean_id = str(issue_id).split()[0].strip()
+    issue = get_issue(clean_id)
+    if not issue:
+        return f"Issue `{clean_id}` was not found.", None, []
+
+    status_tag = "🟢 OPEN" if issue.get("status") == "open" else "⚪ RESOLVED"
+    sev_badge = issue.get("severity", "medium").upper()
+
+    img_path = ROOT / issue["image"] if issue.get("image") else None
+    if img_path and not img_path.exists():
+        img_path = None
+
+    details_md = f"""### {status_tag} | #{issue['id']} — {issue['title']}
+
+- **Category:** `{issue['category']}`
+- **Severity:** `{sev_badge}` | **Safety Risk:** `{'Yes' if issue.get('safety_risk') else 'No'}`
+- **Reported By:** `{issue['reporter']}` | **Reported Time:** {format_campus_time(issue['created_at'])}
+- **Location:** {issue['location_hint']}
+- **Confirmations (+1):** {issue.get('confirmations', 0)}
+- **Summary:** {issue['summary']}
+- **AI Triage Reasoning:** *{issue['reason']}*
+"""
+    if issue.get("status") == "resolved":
+        details_md += f"""
+---
+#### Resolution Details:
+- **Resolved By:** `{issue.get('resolved_by')}` at {format_campus_time(issue.get('resolved_at'))}
+- **Resolution Note:** {issue.get('resolution_note')}
+"""
+
+    log_rows = []
+    for ev in issue.get("log", []):
+        log_rows.append([
+            format_campus_time(ev.get("at")),
+            ev.get("event"),
+            ev.get("by"),
+            ev.get("note", "-"),
+        ])
+
+    return details_md, str(img_path) if img_path else None, log_rows
+
+
+def handle_add_me_too(issue_id, nickname):
+    """Handle '+1' confirmation button."""
+    if not issue_id:
+        return "Please select an issue ID first."
+    clean_id = str(issue_id).split()[0].strip()
+    try:
+        msg = add_me_too(clean_id, by=nickname)
+        return msg
+    except Exception as e:
+        return f"Error: {e}"
+
+
+def handle_resolve(issue_id, nickname, note):
+    """Handle 'Mark resolved' button."""
+    if not issue_id:
+        return "Please select an issue ID first."
+    clean_id = str(issue_id).split()[0].strip()
+    try:
+        resolve(clean_id, by=nickname, note=note)
+        return f"Issue #{clean_id} successfully marked as resolved."
+    except ValueError as ve:
+        return f"Validation error: {ve}"
+    except Exception as e:
+        return f"Error: {e}"
+
+
+def handle_reopen(issue_id, nickname):
+    """Handle 'Reopen' button."""
+    if not issue_id:
+        return "Please select an issue ID first."
+    clean_id = str(issue_id).split()[0].strip()
+    try:
+        reopen(clean_id, by=nickname)
+        return f"Issue #{clean_id} reopened and restored to active board."
+    except Exception as e:
+        return f"Error: {e}"
+
+
+def handle_confirm_review(review_selection, new_category, nickname):
+    """Approve or recategorize a flagged issue."""
+    if not review_selection:
+        return "Please choose an issue from the review queue."
+    clean_id = str(review_selection).split()[0].strip()
+    cat = new_category if (new_category and new_category != "Keep Current") else None
+    try:
+        confirm_review(clean_id, by=nickname, category=cat)
+        return f"Issue #{clean_id} approved and restored to active board."
+    except Exception as e:
+        return f"Error: {e}"
+
+
+# ---------------- TAB 3: REPORT A PROBLEM ----------------
 
 def submit_report(image_path, text_input, nickname_input, session_token):
     """Process a new issue report: validation, cleaning, Gemma triage, duplicate check, and save."""
@@ -114,20 +430,20 @@ def submit_report(image_path, text_input, nickname_input, session_token):
     has_image = bool(image_path)
 
     if not has_image and not clean_text:
-        return "⚠️ Please add a photo or describe the problem.", None
+        return "Please add a photo or describe the problem.", ""
 
     if len(clean_text) > MAX_TEXT_CHARS:
-        return f"⚠️ Text description exceeds {MAX_TEXT_CHARS} characters limit.", None
+        return f"Text description exceeds {MAX_TEXT_CHARS} characters limit.", ""
 
     # Check session rate limit
     sess_key = session_token or "default_user"
     if not _check_rate_limit(sess_key):
-        return f"⚠️ Rate limit reached: maximum {SUBMITS_PER_10_MIN} reports per 10 minutes. Please wait before submitting again.", None
+        return f"Rate limit reached: maximum {SUBMITS_PER_10_MIN} reports per 10 minutes. Please wait before submitting again.", ""
 
     try:
         clean_user = clean_nickname(nickname_input)
     except ValueError as e:
-        return f"⚠️ Nickname error: {e}", None
+        return f"Nickname error: {e}", ""
 
     # Step 1: Temporary ID for image storage
     temp_id = f"img_{int(time.time() * 1000) % 1000000:06d}"
@@ -136,9 +452,9 @@ def submit_report(image_path, text_input, nickname_input, session_token):
         try:
             saved_img_rel = save_clean_image(image_path, temp_id)
         except ValueError as err:
-            return f"⚠️ Image upload rejected: {err}", None
+            return f"Image upload rejected: {err}", ""
 
-    # Step 2: One Gemma triage call
+    # Step 2: Exactly one Gemma triage call
     triage_result = triage(clean_text, image_path=image_path)
 
     # Step 3: Check possible duplicates among open issues in same category
@@ -179,11 +495,6 @@ def submit_report(image_path, text_input, nickname_input, session_token):
             if old_path.exists():
                 os.replace(old_path, new_path)
                 created["image"] = real_img_rel
-                # Update store with real image path
-                all_issues = list_issues()
-                for itm in all_issues:
-                    if itm["id"] == created["id"]:
-                        itm["image"] = real_img_rel
                 from campusfix.store import _get_store_path, _read_data, _write_data
                 p = _get_store_path()
                 d = _read_data(p)
@@ -194,21 +505,12 @@ def submit_report(image_path, text_input, nickname_input, session_token):
         except OSError:
             pass
 
-    # Points earned calculation
+    # Points calculation
     points_earned = 0
     if clean_user != "anonymous" and not created["needs_review"]:
         points_earned = PTS_REPORT
         if has_image and clean_text:
             points_earned += PTS_FULL_REPORT_BONUS
-
-    # Build result card
-    sev = created["severity"].upper()
-    sev_color = {
-        "CRITICAL": "#d9383a",
-        "HIGH": "#e67e22",
-        "MEDIUM": "#f39c12",
-        "LOW": "#27ae60",
-    }.get(sev, "#888")
 
     pts_notice = f"⭐ **You earned {points_earned} points!**" if points_earned > 0 else (
         "*(No points awarded: anonymous report or needs moderation)*"
@@ -217,228 +519,33 @@ def submit_report(image_path, text_input, nickname_input, session_token):
     review_notice = ""
     if created["needs_review"]:
         review_notice = (
-            "\n\n> 🔍 **Needs a look:** This report was flagged for moderator verification "
-            "(it may be off-topic or uncertain). It appears in the 'Needs a look' review queue."
+            "\n\n> 🔍 **Needs Moderation:** This report was flagged for review "
+            "(it may be ambiguous or uncertain). It is queued in 'Needs a Look'."
         )
 
     dup_notice = ""
     if dup_hints:
-        dup_notice = "\n\n💡 **Possible existing issues:**\n- " + "\n- ".join(dup_hints) + "\n*(Consider confirming an existing issue instead of creating duplicate reports!)*"
+        dup_notice = "\n\n💡 **Similar existing issues:**\n- " + "\n- ".join(dup_hints) + "\n*(Consider confirming an existing issue instead of creating duplicate tickets!)*"
 
-    result_md = f"""### ✅ Issue Reported Successfully!
+    result_md = f"""### ✅ Issue Logged Successfully
 
-**Issue ID:** `{created['id']}`  
-**Title:** **{created['title']}**  
-**Category:** `{created['category']}`  
-**Severity:** <span style="background:{sev_color}; color:#fff; padding:2px 8px; border-radius:4px; font-weight:bold;">{sev}</span>  
-**Location:** {created['location_hint']}  
-**Summary:** {created['summary']}  
-**Reasoning:** {created['reason']}  
+- **Issue ID:** `{created['id']}`
+- **Title:** **{created['title']}**
+- **Category:** `{created['category']}`
+- **Severity:** `{created['severity'].upper()}`
+- **Location:** {created['location_hint']}
+- **Summary:** {created['summary']}
+- **AI Triage Reasoning:** *{created['reason']}*
 
 {pts_notice}{review_notice}{dup_notice}
 """
     return result_md, ""
 
 
-# ---------------- TAB 2: BOARD ----------------
-
-def load_board_data(category_filter, show_archive):
-    """Load ranked active issues or resolved archive table."""
-    now_utc = datetime.now(timezone.utc)
-    all_issues = list_issues()
-
-    if show_archive:
-        # Show resolved archive
-        resolved_list = [i for i in all_issues if i.get("status") == "resolved"]
-        if category_filter and category_filter != "All":
-            resolved_list = [i for i in resolved_list if i.get("category") == category_filter]
-
-        rows = []
-        for i in resolved_list:
-            rows.append([
-                i.get("id"),
-                i.get("category"),
-                i.get("severity", "").upper(),
-                i.get("title"),
-                i.get("location_hint"),
-                format_campus_time(i.get("created_at")),
-                format_campus_time(i.get("resolved_at")),
-                i.get("resolved_by", "-"),
-                i.get("resolution_note", "-"),
-            ])
-        headers = ["ID", "Category", "Severity", "Title", "Location", "Reported", "Resolved", "Resolved By", "Note"]
-        return rows, headers
-
-    # Active open issues
-    ranked = rank_open(all_issues, now_utc)
-    if category_filter and category_filter != "All":
-        ranked = [i for i in ranked if i.get("category") == category_filter]
-
-    rows = []
-    for r in ranked:
-        rows.append([
-            r.get("score"),
-            r.get("id"),
-            r.get("category"),
-            r.get("severity", "").upper(),
-            r.get("title"),
-            r.get("location_hint"),
-            format_campus_time(r.get("created_at")),
-            f"{r.get('age_days', 0):.1f}d",
-            r.get("age_label") or "-",
-            f"+{r.get('confirmations', 0)}",
-        ])
-    headers = ["Score", "ID", "Category", "Severity", "Title", "Location", f"Reported ({CAMPUS_TZ})", "Age", "Status", "+1s"]
-    return rows, headers
-
-
-def get_category_choices():
-    """Return category dropdown choices with current open issue counts."""
-    open_issues = list_issues(status="open")
-    counts = {}
-    for i in open_issues:
-        c = i.get("category", "Other")
-        counts[c] = counts.get(c, 0) + 1
-
-    choices = ["All"]
-    for cat in CATEGORIES:
-        cnt = counts.get(cat, 0)
-        choices.append(f"{cat} ({cnt})")
-    return choices
-
-
-def get_issue_choices():
-    """List IDs of all issues for selection dropdown."""
-    issues = list_issues()
-    return [i["id"] for i in issues]
-
-
-def get_review_choices():
-    """List IDs of issues waiting for moderator review."""
-    review_issues = [i for i in list_issues() if i.get("needs_review")]
-    return [f"{i['id']} - {i['title']}" for i in review_issues]
-
-
-def view_issue_details(issue_id):
-    """Render details, photo, and event log for a selected issue."""
-    if not issue_id:
-        return "Select an issue to inspect its details.", None, []
-
-    # Strip label if selected from composite dropdown
-    clean_id = issue_id.split()[0].strip()
-    issue = get_issue(clean_id)
-    if not issue:
-        return f"Issue `{clean_id}` not found.", None, []
-
-    status_tag = "🟢 OPEN" if issue.get("status") == "open" else "⚪ RESOLVED"
-    img_path = ROOT / issue["image"] if issue.get("image") else None
-    if img_path and not img_path.exists():
-        img_path = None
-
-    details_md = f"""### {status_tag}: #{issue['id']} - {issue['title']}
-
-- **Category:** `{issue['category']}`
-- **Severity:** `{issue['severity'].upper()}` | **Safety Risk:** `{'Yes' if issue.get('safety_risk') else 'No'}`
-- **Reporter:** `{issue['reporter']}` | **Reported:** {format_campus_time(issue['created_at'])}
-- **Location:** {issue['location_hint']}
-- **Confirmations (+1):** {issue.get('confirmations', 0)}
-- **Summary:** {issue['summary']}
-- **AI Triage Reasoning:** *{issue['reason']}*
-"""
-    if issue.get("status") == "resolved":
-        details_md += f"""
----
-#### Resolution Details:
-- **Resolved By:** `{issue.get('resolved_by')}` at {format_campus_time(issue.get('resolved_at'))}
-- **Resolution Note:** {issue.get('resolution_note')}
-"""
-
-    log_rows = []
-    for ev in issue.get("log", []):
-        log_rows.append([
-            format_campus_time(ev.get("at")),
-            ev.get("event"),
-            ev.get("by"),
-            ev.get("note", "-"),
-        ])
-
-    return details_md, str(img_path) if img_path else None, log_rows
-
-
-def handle_add_me_too(issue_id, nickname):
-    """Handle '+1' confirmation button."""
-    if not issue_id:
-        return "⚠️ Please select an issue ID first."
-    clean_id = issue_id.split()[0].strip()
-    try:
-        msg = add_me_too(clean_id, by=nickname)
-        return f"ℹ️ {msg}"
-    except Exception as e:
-        return f"⚠️ Error: {e}"
-
-
-def handle_resolve(issue_id, nickname, note):
-    """Handle 'Mark resolved' button."""
-    if not issue_id:
-        return "⚠️ Please select an issue ID first."
-    clean_id = issue_id.split()[0].strip()
-    try:
-        resolve(clean_id, by=nickname, note=note)
-        return f"✅ Issue #{clean_id} marked as resolved! Points updated on the leaderboard."
-    except ValueError as ve:
-        return f"⚠️ Resolve validation: {ve}"
-    except Exception as e:
-        return f"⚠️ Error: {e}"
-
-
-def handle_reopen(issue_id, nickname):
-    """Handle 'Reopen' button."""
-    if not issue_id:
-        return "⚠️ Please select an issue ID first."
-    clean_id = issue_id.split()[0].strip()
-    try:
-        reopen(clean_id, by=nickname)
-        return f"🔄 Issue #{clean_id} reopened and restored to active board with original report date."
-    except Exception as e:
-        return f"⚠️ Error: {e}"
-
-
-def handle_confirm_review(review_selection, new_category, nickname):
-    """Approve or recategorize a flagged issue."""
-    if not review_selection:
-        return "⚠️ Please choose an item from the review queue."
-    clean_id = review_selection.split()[0].strip()
-    cat = new_category if (new_category and new_category != "Keep Current") else None
-    try:
-        confirm_review(clean_id, by=nickname, category=cat)
-        return f"✅ Issue #{clean_id} verified and released to the active board!"
-    except Exception as e:
-        return f"⚠️ Error: {e}"
-
-
-def ask_the_board(query):
-    """Use the model harness with read-only tools to answer campus issue queries."""
-    if not query or not query.strip():
-        return "", "Please enter a question to ask the board."
-    rule = (
-        "You are the CampusFix assistant. You help students and staff find campus issues using "
-        "the available tools: list_top_issues, count_by_category, and find_issues. "
-        "Keep answers concise, direct, and factual."
-    )
-    agent = Agent(system=rule, max_steps=3)
-    try:
-        answer = agent.run(query)
-    except Exception as err:
-        import gemma_client
-        return "", gemma_client.describe_error(err)
-    steps = "\n".join(f"{i}. {s['text']}" for i, s in enumerate(agent.steps[:-1], 1))
-    return steps or "(No tools were needed)", answer
-
-
-# ---------------- TAB 3: LEADERBOARD ----------------
+# ---------------- TAB 4: LEADERBOARD ----------------
 
 def load_leaderboard_view(time_window, nickname):
-    """Compute leaderboard and campus statistics for all-time or last 7 days."""
+    """Compute leaderboard rankings and campus statistics."""
     now_utc = datetime.now(timezone.utc)
     all_issues = list_issues()
     window_days = 7 if time_window == "Last 7 days" else None
@@ -446,7 +553,7 @@ def load_leaderboard_view(time_window, nickname):
     rows = compute_leaderboard(all_issues, now_utc, window_days=window_days)
 
     table_data = []
-    for r in rows[:10]:
+    for r in rows[:15]:
         table_data.append([
             f"#{r['rank']}",
             r["name"],
@@ -462,125 +569,245 @@ def load_leaderboard_view(time_window, nickname):
         user_row = next(r for r in rows if r["rank"] == user_rank)
         rank_md = f"🏅 **Your standing:** You are **Rank #{user_rank}** with **{user_row['points']} pts** ({user_row['badges']})!"
     elif nickname and clean_nickname(nickname) != "anonymous":
-        rank_md = f"👋 Hello **{clean_nickname(nickname)}**! You haven't earned points yet. Report or fix an issue to appear on the leaderboard!"
+        rank_md = f"👋 Hello **{clean_nickname(nickname)}**! You have 0 points. Submit a report or resolve an issue to appear on the leaderboard."
     else:
-        rank_md = "💡 *Enter a nickname in the box above to see your personal rank and badges.*"
+        rank_md = "💡 *Enter your nickname in the header above to check your personal rank.*"
 
-    # Campus stats strip
+    # Campus stats summary
     stats = campus_stats(all_issues, now_utc)
-    oldest_txt = f"#{stats['oldest_open']['id']} ({stats['oldest_age_days']} days)" if stats['oldest_open'] else "None"
-    stats_md = f"""| 🏛️ Open Issues | ✅ Resolved This Week | ⏳ Oldest Open Issue | 📊 Average Issue Age |
+    oldest_txt = f"#{stats['oldest_open']['id']} ({stats['oldest_age_days']} days old)" if stats['oldest_open'] else "None"
+    stats_md = f"""| Open Issues | Resolved This Week | Oldest Open Issue | Average Issue Age |
 | :---: | :---: | :---: | :---: |
 | **{stats['open_count']}** | **{stats['resolved_this_week']}** | **{oldest_txt}** | **{stats['average_age_days']} days** |
 """
     return table_data, rank_md, stats_md
 
 
-# ---------------- GRADIO UI CONSTRUCTION ----------------
+# ---------------- STRETCH FEATURE: ASK THE BOARD ----------------
 
-# CHANGE THIS: customize CSS or component structure
+def ask_the_board(query):
+    """Use the model harness with read-only tools to answer campus questions."""
+    if not query or not str(query).strip():
+        return "", "Please enter a question to ask the board."
+    rule = (
+        "You are the CampusFix assistant. You help students and staff find campus issues using "
+        "the available tools: list_top_issues, count_by_category, and find_issues. "
+        "Keep answers concise, direct, and factual."
+    )
+    agent = Agent(system=rule, max_steps=3)
+    try:
+        answer = agent.run(str(query).strip())
+    except Exception as err:
+        import gemma_client
+        return "", gemma_client.describe_error(err)
+    steps = "\n".join(f"{i}. {s['text']}" for i, s in enumerate(agent.steps[:-1], 1))
+    return steps or "(No tools needed)", answer
+
+
+# ---------------- PRODUCTION GRADIO INTERFACE ----------------
+
 custom_css = """
-.main-header { text-align: center; margin-bottom: 8px; }
-.sub-header { text-align: center; color: #666; margin-bottom: 16px; font-size: 0.95em; }
-.stat-box { border-radius: 8px; padding: 12px; }
+/* Clean, Light, Production SaaS Styling */
+body, .gradio-container {
+    background-color: #f8fafc !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    color: #0f172a !important;
+}
+
+/* Header bar */
+.cf-header {
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 14px 24px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Subtle cards */
+.cf-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+/* Tabs appearance */
+.tabs > .tab-nav {
+    border-bottom: 1px solid #e2e8f0 !important;
+    background: transparent !important;
+}
+
+.tabs > .tab-nav button {
+    font-size: 0.95rem !important;
+    font-weight: 500 !important;
+    color: #475569 !important;
+    padding: 8px 16px !important;
+    border-bottom: 2px solid transparent !important;
+}
+
+.tabs > .tab-nav button.selected {
+    color: #1d4ed8 !important;
+    border-bottom: 2px solid #1d4ed8 !important;
+    font-weight: 600 !important;
+}
+
+/* Restrained Primary Buttons */
+button.primary {
+    background: #1d4ed8 !important;
+    color: #ffffff !important;
+    border: 1px solid #1e40af !important;
+    border-radius: 6px !important;
+    font-weight: 500 !important;
+}
+
+button.primary:hover {
+    background: #1e40af !important;
+}
+
+/* Tables */
+table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+    background: #ffffff !important;
+}
+
+th {
+    background-color: #f8fafc !important;
+    color: #475569 !important;
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+}
+
+td {
+    color: #1e293b !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+}
+
+tr:hover td {
+    background-color: #f8fafc !important;
+}
 """
 
-with gr.Blocks(title=TITLE) as demo:
+with gr.Blocks(title=TITLE, theme=gr.themes.Default(primary_hue="blue", neutral_hue="slate")) as demo:
     session_id_state = gr.State(lambda: f"sess_{int(time.time()*1000)}")
 
-    gr.Markdown(f"# 🛠️ {TITLE}: Campus Issue Tracker & Leaderboard", elem_classes=["main-header"])
-    gr.Markdown(
-        "Report campus problems with text or photos. Gemma 4 classifies category & severity. "
-        "Earn community points for reporting, confirming, and resolving issues!",
-        elem_classes=["sub-header"],
-    )
-
-    # Shared Nickname Box
-    with gr.Row():
+    # Top Brand & Global Identity Bar
+    with gr.Row(elem_classes=["cf-card"]):
         with gr.Column(scale=3):
+            gr.Markdown(
+                "## 🛠️ **CampusFix**  \n"
+                "<span style='font-size:0.85rem; color:#64748b; font-weight:normal;'>"
+                "Intelligent campus issue board & community participation tracker • Model: <code>gemma-4-26b-a4b-it</code>"
+                "</span>"
+            )
+        with gr.Column(scale=2):
             nickname_input = gr.Textbox(
-                label="👤 Your Nickname (shown on leaderboard; use a nickname, not your real name)",
-                placeholder="e.g. campus_fixer_42",
+                label="👤 Your Nickname (Public Community ID)",
+                placeholder="e.g. campus_fixer",
                 value="",
             )
-        with gr.Column(scale=1):
-            gr.Markdown(
-                "*Public board: Pick a fun nickname to track your points and badges across tabs.*"
-            )
 
-    # Tabs
+    # Main Navigation Tabs
     with gr.Tabs() as tabs:
-        # TAB 1: Report a Problem
-        with gr.Tab("📝 Report a Problem"):
-            with gr.Row():
-                with gr.Column():
-                    report_img = gr.Image(type="filepath", label="📷 Photo (optional)")
-                    report_txt = gr.Textbox(
-                        label="📄 Description (optional, max 1000 characters)",
-                        placeholder="Describe the issue, location, or what needs fixing...",
-                        lines=4,
-                        max_lines=8,
-                    )
-                    report_submit_btn = gr.Button("🚀 Submit Report to Gemma 4", variant="primary")
-                with gr.Column():
-                    report_status = gr.Markdown("Submit a photo, description, or both to classify your report.")
 
-            report_submit_btn.click(
-                submit_report,
-                inputs=[report_img, report_txt, nickname_input, session_id_state],
-                outputs=[report_status, report_txt],
+        # ---------------- 1. OVERVIEW DASHBOARD ----------------
+        with gr.Tab("🏛️ Overview", id="tab_overview"):
+            banner_view = gr.HTML(value=render_banner_html)
+            stats_view = gr.HTML(value=render_stats_cards_html)
+
+            gr.Markdown("### 🕒 Recently Logged Campus Issues")
+            recent_table = gr.Dataframe(
+                headers=["ID", "Severity", "Status", "Category", "Title", "Location", f"Reported ({CAMPUS_TZ})", "+1s"],
+                value=get_recent_issues_table,
+                interactive=False,
             )
 
-        # TAB 2: Board
-        with gr.Tab("📋 Campus Issue Board"):
             with gr.Row():
-                cat_dropdown = gr.Dropdown(
-                    label="Filter by Category",
+                refresh_overview_btn = gr.Button("🔄 Refresh Overview", variant="secondary")
+
+            def refresh_overview_action():
+                return render_banner_html(), render_stats_cards_html(), get_recent_issues_table()
+
+            refresh_overview_btn.click(
+                refresh_overview_action,
+                outputs=[banner_view, stats_view, recent_table],
+            )
+
+        # ---------------- 2. CAMPUS ISSUES BOARD ----------------
+        with gr.Tab("📋 Campus Issues", id="tab_issues"):
+            with gr.Row():
+                search_box = gr.Textbox(
+                    label="Search Issues",
+                    placeholder="Search by title, location, or keyword...",
+                    scale=2,
+                )
+                status_dropdown = gr.Dropdown(
+                    label="Status",
+                    choices=["Open", "All", "Resolved (Archive)"],
+                    value="Open",
+                    scale=1,
+                )
+                category_dropdown = gr.Dropdown(
+                    label="Category",
                     choices=get_category_choices(),
                     value="All",
-                    interactive=True,
+                    scale=1,
                 )
-                show_archive_cb = gr.Checkbox(label="Show Resolved Archive", value=False)
-                board_refresh_btn = gr.Button("🔄 Refresh Board", variant="secondary")
+                severity_dropdown = gr.Dropdown(
+                    label="Severity",
+                    choices=["All", "Critical", "High", "Medium", "Low"],
+                    value="All",
+                    scale=1,
+                )
+                board_refresh_btn = gr.Button("🔄 Refresh", variant="secondary", scale=1)
 
             board_table = gr.Dataframe(
-                headers=["Score", "ID", "Category", "Severity", "Title", "Location", f"Reported ({CAMPUS_TZ})", "Age", "Status", "+1s"],
-                datatype=["number", "str", "str", "str", "str", "str", "str", "str", "str", "str"],
+                headers=["Score", "ID", "Severity", "Status", "Category", "Title", "Location", f"Reported ({CAMPUS_TZ})", "Age", "+1s"],
+                datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str", "str"],
                 interactive=False,
             )
 
             gr.Markdown("---")
-            gr.Markdown("### 🔍 Inspect & Act on an Issue")
+            gr.Markdown("### 🔍 Inspect Issue Details & Actions")
 
             with gr.Row():
                 with gr.Column(scale=1):
                     selected_issue_input = gr.Textbox(
-                        label="Issue ID to inspect (6 hex chars)",
-                        placeholder="e.g. a1b2c3",
+                        label="Issue ID to Inspect",
+                        placeholder="Enter or paste 6-hex ID (e.g. b55cc4)",
                     )
-                    load_issue_btn = gr.Button("View Issue")
-                    issue_action_msg = gr.Markdown("")
-                    me_too_btn = gr.Button("👍 I face this too (+1)", variant="secondary")
+                    inspect_btn = gr.Button("Inspect Issue", variant="secondary")
+                    action_feedback = gr.Markdown("")
+
+                    me_too_btn = gr.Button("👍 I Face This Too (+1)", variant="secondary")
 
                     resolve_note_input = gr.Textbox(
-                        label="Resolution Note (min 10 characters required)",
-                        placeholder="Explain what was repaired or resolved...",
+                        label="Resolution Note",
+                        placeholder="Explain what was repaired (min 10 characters required)...",
                         lines=2,
                     )
                     resolve_btn = gr.Button("✅ Mark Resolved", variant="primary")
                     reopen_btn = gr.Button("🔄 Reopen Issue", variant="stop")
 
                 with gr.Column(scale=2):
-                    issue_details_md = gr.Markdown("Select an issue ID to view details.")
-                    issue_photo = gr.Image(label="Issue Photo", visible=True)
+                    issue_details_md = gr.Markdown("Select an issue ID on the left to view full details.")
+                    issue_photo = gr.Image(label="Attached Photo", visible=True)
                     log_table = gr.Dataframe(
                         headers=["Timestamp", "Action", "By", "Note"],
                         interactive=False,
-                        label="Issue Event Log",
+                        label="Issue Audit Log",
                     )
 
-            gr.Markdown("---")
-            with gr.Accordion("🔍 Needs a Look (Review Queue)", open=False):
+            # Moderation Review Accordion
+            with gr.Accordion("🔍 Needs a Look (Moderator Review Queue)", open=False):
                 with gr.Row():
                     review_select = gr.Dropdown(
                         label="Flagged Issues",
@@ -588,54 +815,44 @@ with gr.Blocks(title=TITLE) as demo:
                         interactive=True,
                     )
                     review_cat = gr.Dropdown(
-                        label="Set Category",
+                        label="Assign Category",
                         choices=["Keep Current"] + CATEGORIES,
                         value="Keep Current",
                     )
                     confirm_review_btn = gr.Button("Approve / Recategorize", variant="primary")
-                review_status_md = gr.Markdown("")
+                review_feedback = gr.Markdown("")
 
-            with gr.Accordion("🤖 Stretch Feature: Ask the Board (Agent with Tools)", open=False):
-                gr.Markdown("*(Note: This experimental feature uses the model harness and may make several Gemma calls)*")
+            # Stretch Agent Tool Accordion
+            with gr.Accordion("🤖 Stretch Feature: Ask the Board (AI Agent with Tools)", open=False):
+                gr.Markdown("*(Note: This experimental tool executes an agent loop using `Agent(max_steps=3)`)*")
                 with gr.Row():
-                    ask_board_query = gr.Textbox(
-                        label="Ask a question about campus issues",
-                        placeholder="e.g. Which issues are critical? Or how many problems are in Electrical?",
+                    ask_query = gr.Textbox(
+                        label="Query",
+                        placeholder="e.g. Which issues are critical? How many issues in Electrical?",
                         scale=3,
                     )
-                    ask_board_btn = gr.Button("Ask the Board", variant="primary", scale=1)
-                ask_board_steps = gr.Textbox(label="Agent Tool Steps", lines=3)
-                ask_board_answer = gr.Textbox(label="Agent Answer", lines=3)
+                    ask_btn = gr.Button("Ask the Board", variant="primary", scale=1)
+                agent_steps_txt = gr.Textbox(label="Agent Tool Steps", lines=3)
+                agent_answer_txt = gr.Textbox(label="Agent Answer", lines=3)
 
-                ask_board_btn.click(
+                ask_btn.click(
                     ask_the_board,
-                    inputs=[ask_board_query],
-                    outputs=[ask_board_steps, ask_board_answer],
+                    inputs=[ask_query],
+                    outputs=[agent_steps_txt, agent_answer_txt],
                 )
 
-            # Board interactions
-            def update_board_view(cat, archive):
-                clean_cat = cat.split(" (")[0].strip() if cat else "All"
-                rows, headers = load_board_data(clean_cat, archive)
-                return gr.update(value=rows, headers=headers)
+            # Board Interaction Event Bindings
+            def update_board_view(search, status, cat, sev):
+                return filter_board_data(search, status, cat, sev)
 
-            board_refresh_btn.click(
-                update_board_view,
-                inputs=[cat_dropdown, show_archive_cb],
-                outputs=[board_table],
-            )
-            cat_dropdown.change(
-                update_board_view,
-                inputs=[cat_dropdown, show_archive_cb],
-                outputs=[board_table],
-            )
-            show_archive_cb.change(
-                update_board_view,
-                inputs=[cat_dropdown, show_archive_cb],
-                outputs=[board_table],
-            )
+            for trigger in [board_refresh_btn.click, search_box.submit, status_dropdown.change, category_dropdown.change, severity_dropdown.change]:
+                trigger(
+                    update_board_view,
+                    inputs=[search_box, status_dropdown, category_dropdown, severity_dropdown],
+                    outputs=[board_table],
+                )
 
-            load_issue_btn.click(
+            inspect_btn.click(
                 view_issue_details,
                 inputs=[selected_issue_input],
                 outputs=[issue_details_md, issue_photo, log_table],
@@ -644,70 +861,100 @@ with gr.Blocks(title=TITLE) as demo:
             me_too_btn.click(
                 handle_add_me_too,
                 inputs=[selected_issue_input, nickname_input],
-                outputs=[issue_action_msg],
+                outputs=[action_feedback],
             ).then(
                 view_issue_details,
                 inputs=[selected_issue_input],
                 outputs=[issue_details_md, issue_photo, log_table],
             ).then(
                 update_board_view,
-                inputs=[cat_dropdown, show_archive_cb],
+                inputs=[search_box, status_dropdown, category_dropdown, severity_dropdown],
                 outputs=[board_table],
             )
 
             resolve_btn.click(
                 handle_resolve,
                 inputs=[selected_issue_input, nickname_input, resolve_note_input],
-                outputs=[issue_action_msg],
+                outputs=[action_feedback],
             ).then(
                 view_issue_details,
                 inputs=[selected_issue_input],
                 outputs=[issue_details_md, issue_photo, log_table],
             ).then(
                 update_board_view,
-                inputs=[cat_dropdown, show_archive_cb],
+                inputs=[search_box, status_dropdown, category_dropdown, severity_dropdown],
                 outputs=[board_table],
             )
 
             reopen_btn.click(
                 handle_reopen,
                 inputs=[selected_issue_input, nickname_input],
-                outputs=[issue_action_msg],
+                outputs=[action_feedback],
             ).then(
                 view_issue_details,
                 inputs=[selected_issue_input],
                 outputs=[issue_details_md, issue_photo, log_table],
             ).then(
                 update_board_view,
-                inputs=[cat_dropdown, show_archive_cb],
+                inputs=[search_box, status_dropdown, category_dropdown, severity_dropdown],
                 outputs=[board_table],
             )
 
             confirm_review_btn.click(
                 handle_confirm_review,
                 inputs=[review_select, review_cat, nickname_input],
-                outputs=[review_status_md],
+                outputs=[review_feedback],
             ).then(
                 update_board_view,
-                inputs=[cat_dropdown, show_archive_cb],
+                inputs=[search_box, status_dropdown, category_dropdown, severity_dropdown],
                 outputs=[board_table],
             )
 
-        # TAB 3: Leaderboard
-        with gr.Tab("🏆 Leaderboard & Stats"):
+        # ---------------- 3. REPORT AN ISSUE ----------------
+        with gr.Tab("📝 Report an Issue", id="tab_report"):
+            gr.Markdown(
+                "### Report a Campus Facility Problem  \n"
+                "<span style='font-size:0.9rem; color:#64748b;'>"
+                "Submit a photo, description, or both. Gemma 4 will automatically categorize and assess severity."
+                "</span>"
+            )
+
+            with gr.Row():
+                with gr.Column(scale=1):
+                    report_img_input = gr.Image(type="filepath", label="📷 Upload Photo (optional)")
+                    report_txt_input = gr.Textbox(
+                        label="📄 Problem Description (optional, max 1000 characters)",
+                        placeholder="Describe the issue, location, or physical damage...",
+                        lines=4,
+                        max_lines=8,
+                    )
+                    report_submit_btn = gr.Button("Submit Report to Gemma 4", variant="primary")
+                with gr.Column(scale=1):
+                    report_result_card = gr.Markdown(
+                        "Submit a photo or description to initiate Gemma 4 triage."
+                    )
+
+            report_submit_btn.click(
+                submit_report,
+                inputs=[report_img_input, report_txt_input, nickname_input, session_id_state],
+                outputs=[report_result_card, report_txt_input],
+            )
+
+        # ---------------- 4. LEADERBOARD ----------------
+        with gr.Tab("🏆 Leaderboard", id="tab_leaderboard"):
             with gr.Row():
                 time_radio = gr.Radio(
-                    label="View Window",
+                    label="Leaderboard Window",
                     choices=["All time", "Last 7 days"],
                     value="All time",
                 )
-                refresh_leaderboard_btn = gr.Button("🔄 Refresh Leaderboard", variant="secondary")
+                refresh_leaderboard_btn = gr.Button("🔄 Refresh Rankings", variant="secondary")
 
-            user_rank_banner = gr.Markdown("Enter your nickname above to see your rank.")
-            stats_banner = gr.Markdown("")
+            user_rank_card = gr.Markdown("Enter your nickname in the header above to see your personal rank.")
+            stats_strip = gr.Markdown("")
 
             leaderboard_table = gr.Dataframe(
-                headers=["Rank", "Nickname", "Points", "Reports", "Resolves", "Badges"],
+                headers=["Rank", "Participant", "Points", "Reports", "Resolves", "Badges"],
                 datatype=["str", "str", "number", "number", "number", "str"],
                 interactive=False,
             )
@@ -715,33 +962,32 @@ with gr.Blocks(title=TITLE) as demo:
             gr.Markdown(get_points_rules_md())
             gr.Markdown(
                 "> ℹ️ **Fairness & Privacy Notice:** Nicknames are self-assigned and unauthenticated. "
-                "The leaderboard is designed for friendly campus community encouragement, not official prizes."
+                "The leaderboard is designed for friendly community motivation rather than high-stakes prizes."
             )
 
-            def update_leaderboard_tab(window, nick):
-                table, rank_txt, stats_txt = load_leaderboard_view(window, nick)
-                return table, rank_txt, stats_txt
+            def update_leaderboard_action(window, nick):
+                return load_leaderboard_view(window, nick)
 
             refresh_leaderboard_btn.click(
-                update_leaderboard_tab,
+                update_leaderboard_action,
                 inputs=[time_radio, nickname_input],
-                outputs=[leaderboard_table, user_rank_banner, stats_banner],
+                outputs=[leaderboard_table, user_rank_card, stats_strip],
             )
             time_radio.change(
-                update_leaderboard_tab,
+                update_leaderboard_action,
                 inputs=[time_radio, nickname_input],
-                outputs=[leaderboard_table, user_rank_banner, stats_banner],
+                outputs=[leaderboard_table, user_rank_card, stats_strip],
             )
 
-    # Initial load trigger for Board and Leaderboard
+    # Initial data load
     demo.load(
         update_board_view,
-        inputs=[cat_dropdown, show_archive_cb],
+        inputs=[search_box, status_dropdown, category_dropdown, severity_dropdown],
         outputs=[board_table],
     ).then(
-        update_leaderboard_tab,
+        update_leaderboard_action,
         inputs=[time_radio, nickname_input],
-        outputs=[leaderboard_table, user_rank_banner, stats_banner],
+        outputs=[leaderboard_table, user_rank_card, stats_strip],
     )
 
 if __name__ == "__main__":
