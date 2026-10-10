@@ -122,3 +122,84 @@ def save_note(text: str):
     with NOTES_FILE.open("a", encoding="utf-8") as file:
         file.write(text[:500].replace("\n", " ") + "\n")
     return "Saved the note."
+
+
+# ---------- CampusFix read-only harness tools ----------
+
+ISSUES_FILE = Path(__file__).resolve().parent.parent / "notes" / "issues.json"
+
+
+def _read_campus_issues():
+    """Read issues safely from notes/issues.json without writing or modifying."""
+    if not ISSUES_FILE.exists():
+        return []
+    try:
+        import json
+        data = json.loads(ISSUES_FILE.read_text(encoding="utf-8"))
+        return data.get("issues", []) if isinstance(data, dict) else []
+    except Exception:
+        return []
+
+
+@tool
+def list_top_issues(n: int):
+    """List the highest priority open campus issues.
+
+    n: number of top open issues to return (between 1 and 20)
+    """
+    issues = [i for i in _read_campus_issues() if i.get("status") == "open" and not i.get("needs_review")]
+    if not issues:
+        return "No open issues on the campus board."
+
+    limit = max(1, min(int(n), 20))
+    # Rank by severity base + confirmations
+    sev_weights = {"critical": 100, "high": 60, "medium": 30, "low": 10}
+    issues.sort(
+        key=lambda x: -(sev_weights.get(x.get("severity", "medium"), 30) + x.get("confirmations", 0) * 2)
+    )
+    lines = []
+    for itm in issues[:limit]:
+        lines.append(
+            f"#{itm.get('id')} [{itm.get('severity', '').upper()}] {itm.get('title')} ({itm.get('category')}) - {itm.get('location_hint')}"
+        )
+    result = "\n".join(lines)
+    return result[:2000]
+
+
+@tool
+def count_by_category():
+    """Count open campus issues grouped by category."""
+    issues = [i for i in _read_campus_issues() if i.get("status") == "open"]
+    if not issues:
+        return "No open issues on the campus board."
+    counts = {}
+    for i in issues:
+        cat = i.get("category", "Other")
+        counts[cat] = counts.get(cat, 0) + 1
+    lines = [f"{cat}: {cnt}" for cat, cnt in sorted(counts.items(), key=lambda x: -x[1])]
+    result = "\n".join(lines)
+    return result[:2000]
+
+
+@tool
+def find_issues(keyword: str):
+    """Find campus issues matching a search keyword in title, summary, or location.
+
+    keyword: search word or phrase to look for
+    """
+    key = str(keyword).strip().lower()
+    if not key:
+        return "Please provide a keyword to search."
+    issues = _read_campus_issues()
+    matches = []
+    for i in issues:
+        blob = f"{i.get('title', '')} {i.get('summary', '')} {i.get('text', '')} {i.get('location_hint', '')}".lower()
+        if key in blob:
+            status_tag = "OPEN" if i.get("status") == "open" else "RESOLVED"
+            matches.append(
+                f"#{i.get('id')} [{status_tag} | {i.get('severity', '').upper()}] {i.get('title')} at {i.get('location_hint')}"
+            )
+    if not matches:
+        return f"No campus issues found matching '{keyword}'."
+    result = "\n".join(matches[:15])
+    return result[:2000]
