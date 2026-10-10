@@ -31,7 +31,7 @@ CampusFix uses **`gemma-4-26b-a4b-it`** through the official Google Gemini API v
 
 ---
 
-## How to run it (5 steps)
+## How to run it (5 steps) 
 
 ### 1. Get a free API key
 Sign in to [Google AI Studio](https://aistudio.google.com) and create a Gemini API key.
